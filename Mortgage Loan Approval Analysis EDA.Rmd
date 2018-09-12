@@ -1,0 +1,514 @@
+---
+title: "EDA of Mortgage Loan Decisions"
+author: "Afsar Ali"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 4
+---
+
+## Code header 
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+# Course: ECON 5300L Applied Econometric
+# Title: EDA of Mortgage Loan Decisions 
+# Purpose: Explore Mortgage Loan Decisions outcome
+# Data: MLD Data file.csv
+# Date: Mar 26, 2018
+# Author: Afsar Ali
+```
+
+#Exploratory Data Analysis (EDA)
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+rm(list=ls(all=TRUE))  # Clear all data in environment
+
+#load Packages 
+library(tidyverse)
+library(GGally)
+library(plotly)
+library(car)
+library(ggplot2)
+library(stargazer)
+library(sandwich)
+library(lmtest)   # waldtest; see also coeftest.
+library(psych)
+library(aod)
+library(Rcpp)
+library(Hmisc)
+library(pastecs)
+library(popbio)
+library(rms)
+library(Hmisc)
+library(kableExtra)
+
+# Load data 
+datd <- read.csv("MLD Data File.csv", header = TRUE)
+#Review selected data
+glimpse(datd)
+kable(summary(datd))
+```
+
+## Data Discription
+
+In light of the relatively small number of mortgage loan applications made by minorities, these extra variables were collected for all applications by blacks and Hispanics and for a random sample. The data set includes the following variables.
+
+- APPROVE = 1 if mortgage loan was approved, = 0 otherwise
+- GDLIN = 1 if credit history meets guidelines, = 0 otherwise
+- LOANPRC = loan amount/purchase price
+- OBRAT = other obligations as a percent of total income
+- MALE = 1 if male, = 0 otherwise
+- MARRIED = 1 if married, = 0 otherwise
+- BLACK = 1 if black, = 0 otherwise
+- HISPAN = 1 if Hispanic, = 0 otherwise
+
+##Remove 20 na's obs based on above summary 
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+#filter data 
+dats <-
+  datd %>%
+  filter(GDLIN != 666) %>%
+  filter(MALE != ".") %>%
+  filter(MARRIED != ".") %>%
+  mutate(LOANPRC = LOANPRC*100)
+
+# Change these to factors
+# dats$MARRIED<- as.factor(as.character(dats$MARRIED))
+# dats$APPROVE<- as.factor(as.character(dats$APPROVE))
+# dats$MALE<- as.factor(as.character(dats$MALE))
+# dats$GDLIN<-  as.factor(dats$GDLIN)
+# dats$BLACK<-  as.factor(dats$BLACK)
+# dats$HISPAN<-  as.factor(dats$HISPAN)
+
+#Removed 20 ob
+#Changed it to integer
+
+dats$MARRIED<- as.integer(as.character(dats$MARRIED))
+dats$MALE<- as.integer(as.character(dats$MALE))
+
+#dats$GDLIN<-  as.factor(dats$GDLIN)
+#attach the file for use
+attach(dats)
+
+#Review selected data
+glimpse(dats)
+kable(summary(dats))
+```
+
+##Review GGpair Matrix
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+
+ggpairs(dats,lower = list(continuous="smooth"))
+```
+
+##Review Stats of each variables 
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+##The describe() function which is part of the Hmisc package displays the following additional statistics:
+#Number of rows,#Standard deviation,#Trimmed mean,#Mean absolute deviation,#Skewness,#Kurtosis,#Standard error
+describe(dats)
+```
+
+##Review Variance for anything that may jump out
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+##The stat.desc() function which is part of the pastecs package displays the following additional statistics:
+#Variance,#Coefficient of variation,#Confidence interval for mean
+kable(stat.desc(dats))
+```
+
+##Histogtam of the Variables 
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+#Lot more married obs 
+plot_ly(x = dats$MARRIED,
+             type = "histogram")
+#Small amount of obs that desn't meet credit guideline
+plot_ly(x = dats$GDLIN,
+             type = "histogram")
+#Right Skewed with 36 in the middle 
+plot_ly(x = dats$OBRAT,
+             type = "histogram")
+#Small amount of Black obs
+plot_ly(x = dats$BLACK,
+             type = "histogram")
+#Small amount of Hispanic obs
+plot_ly(x = dats$HISPAN,
+             type = "histogram")
+#Mostly Males
+plot_ly(x = dats$MALE,
+             type = "histogram")
+#Mostly Approved
+plot_ly(x = dats$APPROVE,
+             type = "histogram")
+#LOANPRC = loan amount/purchase price
+#.80 is 20% of the data, .9 is 10% of the data
+plot_ly(x = dats$LOANPRC,
+             type = "histogram") 
+```
+
+##Quantile-Quantile (QQ) Plots
+
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+# after 2 its not normal 
+ggplot(dats, aes(sample = LOANPRC)) + 
+  geom_qq() +
+  ggtitle("Q-Q Plot for LOANPRC")
+
+#looks normally distrubuted
+ggplot(dats, aes(sample = OBRAT)) + 
+  geom_qq() +
+  ggtitle("Q-Q Plot for OBRAT")
+```
+
+##Visulize the relationship & Review Logit relationships
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+# print the two graph side-by-side - Approve
+par(mfrow=c(1,2))
+logi.hist.plot(dats$LOANPRC,dats$APPROVE,logi.mod=1, mainlabel="LoanPRC&Approve",boxp=FALSE,type="hist",col="gray")
+logi.hist.plot(dats$OBRAT,dats$APPROVE,logi.mod=1, mainlabel="OBRAT&Approve",boxp=FALSE,type="hist",col="gray")
+# print the two graph side-by-side - BLACK
+par(mfrow=c(1,2))
+logi.hist.plot(dats$LOANPRC,dats$BLACK,logi.mod=1, mainlabel="LoanPRC&BLACK",boxp=FALSE,type="hist",col="gray")
+logi.hist.plot(dats$OBRAT,dats$BLACK,logi.mod=1, mainlabel="OBRAT&BLACK",boxp=FALSE,type="hist",col="gray")
+# print the two graph side-by-side - Hispanic
+par(mfrow=c(1,2))
+logi.hist.plot(dats$LOANPRC,dats$HISPAN,logi.mod=1, mainlabel="LoanPRC&Hispanic",boxp=FALSE,type="hist",col="gray")
+logi.hist.plot(dats$OBRAT,dats$HISPAN,logi.mod=1, mainlabel="OBRAT&Hispanic",boxp=FALSE,type="hist",col="gray")
+```
+
+###Black relationshps and Logit interactions
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+# Loan to Purchase Ratio, Other obligations and Approval side-by-side - BLACK
+par(mfrow=c(1,2))
+logi.hist.plot(dats$LOANPRC,(dats$APPROVE*dats$BLACK),logi.mod=1, mainlabel="LoanPRC&Approve",boxp=FALSE,type="hist",col="gray")
+logi.hist.plot(dats$OBRAT,(dats$APPROVE*dats$BLACK),logi.mod=1, mainlabel="OBRAT&Approve",boxp=FALSE,type="hist",col="gray")
+
+# Loan to Purchase Ratio, Other obligations and Approval and meets guidline side-by-side - BLACK
+par(mfrow=c(1,2))
+logi.hist.plot(dats$LOANPRC,(dats$APPROVE*dats$BLACK*dats$GDLIN),logi.mod=1, mainlabel="LoanPRC&Approve",boxp=FALSE,type="hist",col="gray")
+logi.hist.plot(dats$OBRAT,(dats$APPROVE*dats$BLACK*dats$GDLIN),logi.mod=1, mainlabel="OBRAT&Approve",boxp=FALSE,type="hist",col="gray")
+
+# Loan to Purchase Ratio, Other obligations and Approval and meets guidline and male side-by-side - BLACK
+par(mfrow=c(1,2))
+logi.hist.plot(dats$LOANPRC,(dats$APPROVE*dats$BLACK*dats$GDLIN*dats$MALE ),logi.mod=1, mainlabel="LoanPRC&Approve",boxp=FALSE,type="hist",col="gray")
+logi.hist.plot(dats$OBRAT,(dats$APPROVE*dats$BLACK*dats$GDLIN*dats$MALE),logi.mod=1, mainlabel="OBRAT&Approve",boxp=FALSE,type="hist",col="gray")
+
+# Loan to Purchase Ratio, Other obligations and Approval and meets guidline and male and marriedside-by-side - BLACK
+par(mfrow=c(1,2))
+logi.hist.plot(dats$LOANPRC,(dats$APPROVE*dats$BLACK*dats$GDLIN*dats$MALE*dats$MARRIED),logi.mod=1, mainlabel="LoanPRC&Approve&",boxp=FALSE,type="hist",col="gray")
+logi.hist.plot(dats$OBRAT,(dats$APPROVE*dats$BLACK*dats$GDLIN*dats$MALE*dats$MARRIED),logi.mod=1, mainlabel="OBRAT&Approve",boxp=FALSE,type="hist",col="gray")
+
+```
+
+###Hispanic relationshps and Logit interactions
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+# Loan to Purchase Ratio, Other obligations and Approval side-by-side - Hispanic
+par(mfrow=c(1,2))
+logi.hist.plot(dats$LOANPRC,(dats$APPROVE*dats$HISPAN),logi.mod=1, mainlabel="LoanPRC&Approve",boxp=FALSE,type="hist",col="gray")
+logi.hist.plot(dats$OBRAT,(dats$APPROVE*dats$HISPAN),logi.mod=1, mainlabel="OBRAT&Approve",boxp=FALSE,type="hist",col="gray")
+
+# Loan to Purchase Ratio, Other obligations and Approval and meets guidline side-by-side - Hispanic
+par(mfrow=c(1,2))
+logi.hist.plot(dats$LOANPRC,(dats$APPROVE*dats$HISPAN*dats$GDLIN),logi.mod=1, mainlabel="LoanPRC&Approve",boxp=FALSE,type="hist",col="gray")
+logi.hist.plot(dats$OBRAT,(dats$APPROVE*dats$HISPAN*dats$GDLIN),logi.mod=1, mainlabel="OBRAT&Approve",boxp=FALSE,type="hist",col="gray")
+
+# Loan to Purchase Ratio, Other obligations and Approval and meets guidline and male side-by-side - Hispanic
+par(mfrow=c(1,2))
+logi.hist.plot(dats$LOANPRC,(dats$APPROVE*dats$HISPAN*dats$GDLIN*dats$MALE ),logi.mod=1, mainlabel="LoanPRC&Approve",boxp=FALSE,type="hist",col="gray")
+logi.hist.plot(dats$OBRAT,(dats$APPROVE*dats$HISPAN*dats$GDLIN*dats$MALE),logi.mod=1, mainlabel="OBRAT&Approve",boxp=FALSE,type="hist",col="gray")
+
+# Loan to Purchase Ratio, Other obligations and Approval and meets guidline and male and marriedside-by-side - Hispanic
+par(mfrow=c(1,2))
+logi.hist.plot(dats$LOANPRC,(dats$APPROVE*dats$HISPAN*dats$GDLIN*dats$MALE*dats$MARRIED),logi.mod=1, mainlabel="LoanPRC&Approve&",boxp=FALSE,type="hist",col="gray")
+logi.hist.plot(dats$OBRAT,(dats$APPROVE*dats$HISPAN*dats$GDLIN*dats$MALE*dats$MARRIED),logi.mod=1, mainlabel="OBRAT&Approve",boxp=FALSE,type="hist",col="gray")
+```
+
+# EDA of different ethnicity
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+# filter out for only Black data
+datb <-
+  dats %>%
+  filter(BLACK == 1) 
+# filter out for only Hispanic data
+dath <-
+  dats %>%
+  filter(HISPAN == 1)
+# filter out for only Hispanic data
+datw <-
+  dats %>%
+  filter(BLACK == 0) %>%
+  filter(HISPAN == 0)
+```
+
+## Descriptive Stats Table of different ethnicity
++ Black and Hispanic makes up relatively small proportion of the data set
++ Black and Hispanic has the lower approval rate compared to White
+
+```{r results='asis', echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+
+stargazer(datw, type = "html", title="Descriptive statistics - White Only", digits=2)
+stargazer(datb, type = "html", title="Descriptive statistics - Black Only", digits=2)
+stargazer(dath, type = "html", title="Descriptive statistics - Hispanic Only", digits=2)
+
+```
+#logit models comparison
+Black only model has only one (meets guidelines) significant variable
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+
+## fit ordered logit model
+glm1 <- glm(APPROVE ~ MALE + GDLIN + LOANPRC + OBRAT + MARRIED + BLACK + HISPAN, data = dats, family = binomial(link="logit"))
+glm2 <- glm(APPROVE ~ GDLIN + LOANPRC + OBRAT + MARRIED + BLACK + HISPAN, data = dats, family = binomial(link="logit"))
+glm3 <- glm(APPROVE ~ GDLIN + LOANPRC + OBRAT + BLACK + HISPAN, data = dats, family = binomial(link="logit"))
+glmw <- glm(APPROVE ~ GDLIN + LOANPRC + OBRAT + MARRIED + BLACK + HISPAN, data = datw, family = binomial(link="logit"))
+glmb <- glm(APPROVE ~ GDLIN + LOANPRC + OBRAT + MARRIED + BLACK + HISPAN, data = datb, family = binomial(link="logit"))
+glmh <- glm(APPROVE ~ GDLIN + LOANPRC + OBRAT + MARRIED + BLACK + HISPAN, data = dath, family = binomial(link="logit"))
+
+## view a summary of the Full model
+summary(glm1)
+#Removed Male since there is no significance 
+summary(glm2)
+# Removed Married since there is small significance
+summary(glm3)
+# White only data
+summary(glmw)
+# Black Only data
+summary(glmb)
+# Hispanic only data
+summary(glmh)
+#Compare the full data set
+anova(glm1, glm2, glm3)
+```
+```{r results='asis', echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+
+#Compare all the modles 
+stargazer(glm1, glm2, glm3, glmw, glmb, glmh, type = "html", 
+          column.labels = c("full Data", "white only", 
+                            "black only", "hispanic only"), column.separate = c(3, 1,1,1))
+          
+```
+
+
+## Odds Ratio for all 6 models
+
+
+```{r results='asis', echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+OR <- function(x) exp(x)
+stargazer(glm1, glm2, glm3, type="html", apply.coef = OR, 
+          title = "Odds Ratio with full data set")
+
+stargazer(glmw, glmb, glmh, type="html",
+          title = "Odds Ratio with different ethnicity",
+          apply.coef = OR, column.labels = c("white only", 
+                                             "black only", "hispanic only"))
+
+stargazer(glm1, glm2, glm3, glmw, glmb, glmh, type="html",
+          title = "Logistic Regression with t stas for significance",
+          report = "vct*", column.labels = c("full Data", "white only",
+                                             "black only", "hispanic only"), 
+          column.separate = c(3, 1,1,1))
+```
+
+```{r results='asis', echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+stargazer(
+exp(cbind(OR = coef(glm1), confint(glm1))),
+exp(cbind(OR = coef(glm2), confint(glm2))),
+exp(cbind(OR = coef(glm3), confint(glm3))),
+exp(cbind(OR = coef(glmw), confint(glmw))),
+exp(cbind(OR = coef(glmb), confint(glmb))),
+exp(cbind(OR = coef(glmh), confint(glmh))),
+type="html")
+```
+
+## Likelihood Ratio Test
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+lrtest(glm2, glm1)
+LR.s.1 <- glm2$deviance - glm1$deviance
+LR.s.2 <- -2*logLik(glm2)[1] - (-2*logLik(glm1)[1])
+pchisq(LR.s.1, 1, lower.tail = FALSE)
+pchisq(LR.s.1, 2, lower.tail = FALSE)
+lrm(glm2)
+lrm(glm1)
+```
+
+## Visulizing Model Fit Analysis 
+- Model with male and married committed seems to be the best fit. 
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+#FUll Model 
+par(mfrow=c(2,2)) # init 4 charts in 1 panel
+plot(glm1)
+#Ommited Gender
+par(mfrow=c(2,2)) # init 4 charts in 1 panel
+plot(glm2)
+#Ommited Gender and Married
+par(mfrow=c(2,2)) # init 4 charts in 1 panel
+plot(glm3)
+```
+ 
+## Correctly classified observations
+
+```{r results='asis', echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+###Correctly classified observations
+#all the same
+stargazer(mean((glm1$fitted.values>=0.5)==dats$APPROVE),
+mean((glm2$fitted.values>=0.5)==dats$APPROVE),
+mean((glm3$fitted.values>=0.5)==dats$APPROVE), type = "text")
+```
+
+##Confusion matrix
+Same outcome
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+
+###Confusion matrix count
+
+#FUll Model
+RP=sum((glm1$fitted.values>=0.5)==dats$APPROVE & dats$APPROVE==1)
+FP=sum((glm1$fitted.values>=0.5)!=dats$APPROVE & dats$APPROVE==0)
+RN=sum((glm1$fitted.values>=0.5)==dats$APPROVE & dats$APPROVE==0)
+FN=sum((glm1$fitted.values>=0.5)!=dats$APPROVE & dats$APPROVE==1)
+confMat1<-matrix(c(RP,FP,FN,RN),ncol = 2)
+colnames(confMat1)<-c("Pred Approved","Pred not Approved")
+rownames(confMat1)<-c("Real Approved","Real not Approved")
+#Ommited Gender
+RP=sum((glm2$fitted.values>=0.5)==dats$APPROVE & dats$APPROVE==1)
+FP=sum((glm2$fitted.values>=0.5)!=dats$APPROVE & dats$APPROVE==0)
+RN=sum((glm2$fitted.values>=0.5)==dats$APPROVE & dats$APPROVE==0)
+FN=sum((glm2$fitted.values>=0.5)!=dats$APPROVE & dats$APPROVE==1)
+confMat2<-matrix(c(RP,FP,FN,RN),ncol = 2)
+colnames(confMat2)<-c("Pred Approved","Pred not Approved")
+rownames(confMat2)<-c("Real Approved","Real not Approved")
+#Ommited Gender and Married
+RP=sum((glm3$fitted.values>=0.5)==dats$APPROVE & dats$APPROVE==1)
+FP=sum((glm3$fitted.values>=0.5)!=dats$APPROVE & dats$APPROVE==0)
+RN=sum((glm3$fitted.values>=0.5)==dats$APPROVE & dats$APPROVE==0)
+FN=sum((glm3$fitted.values>=0.5)!=dats$APPROVE & dats$APPROVE==1)
+confMat3<-matrix(c(RP,FP,FN,RN),ncol = 2)
+colnames(confMat3)<-c("Pred Approved","Pred not Approved")
+rownames(confMat3)<-c("Real Approved","Real not Approved")
+###Confusion matrix count for the 3 Models
+kable(
+  rbind(
+    confMat1,
+    confMat2,
+    confMat3))
+
+###Confusion matrix proportion
+
+#FUll Model
+RPR=RP/sum(dats$APPROVE==1)*100
+FPR=FP/sum(dats$APPROVE==0)*100
+RNR=RN/sum(dats$APPROVE==0)*100
+FNR=FN/sum(dats$APPROVE==1)*100
+confMat1<-matrix(c(RPR,FPR,FNR,RNR),ncol = 2)
+colnames(confMat1)<-c("Pred Approved","Pred not Approved")
+rownames(confMat1)<-c("Real Approved","Real not Approved")
+#Ommited Gender
+RPR=RP/sum(dats$APPROVE==1)*100
+FPR=FP/sum(dats$APPROVE==0)*100
+RNR=RN/sum(dats$APPROVE==0)*100
+FNR=FN/sum(dats$APPROVE==1)*100
+confMat2<-matrix(c(RPR,FPR,FNR,RNR),ncol = 2)
+colnames(confMat2)<-c("Pred Approved","Pred not Approved")
+rownames(confMat2)<-c("Real Approved","Real not Approved")
+#Ommited Gender and Married
+RPR=RP/sum(dats$APPROVE==1)*100
+FPR=FP/sum(dats$APPROVE==0)*100
+RNR=RN/sum(dats$APPROVE==0)*100
+FNR=FN/sum(dats$APPROVE==1)*100
+confMat3<-matrix(c(RPR,FPR,FNR,RNR),ncol = 2)
+colnames(confMat3)<-c("Pred Approved","Pred not Approved")
+rownames(confMat3)<-c("Real Approved","Real not Approved")
+
+###Confusion matrix proportion
+kable(
+  rbind(
+    confMat1,
+    confMat2,
+    confMat3))
+
+```
+
+## Prototypical Analysis
+Both Probit and Logit prediction shows that Hispanics and Blacks are less likely to get approval to loans when compared to whites
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+
+#Estimate Logit Model
+LogitModel = glm(APPROVE ~ OBRAT + BLACK + HISPAN, data = dats, 
+                 family = "binomial")
+summary(LogitModel)
+
+#Generate Odds Ratios
+exp(coef(LogitModel))
+
+#Define prototypical loan applicants (you will need more than 3)
+prototype1 <- data.frame(OBRAT=mean(dats$OBRAT),BLACK = 1, HISPAN = 0)
+prototype2 <- data.frame(OBRAT=mean(dats$OBRAT),BLACK = 0, HISPAN = 1)
+prototype3 <- data.frame(OBRAT=mean(dats$OBRAT),BLACK = 0, HISPAN = 0)
+
+#Predict probabilities for prototypical individuals
+prototype1$predictedprob <- predict (LogitModel, newdata = prototype1, type ="response")
+prototype2$predictedprob <- predict (LogitModel, newdata = prototype2, type ="response")
+prototype3$predictedprob <- predict (LogitModel, newdata = prototype3, type ="response")
+#logit Probability
+kable(rbind( prototype1,
+       prototype2,
+       prototype3))
+
+
+#Estimate Probit Model
+ProbitModel = glm(APPROVE ~ OBRAT + BLACK + HISPAN, data = dats, 
+                  family = "binomial" (link = "probit"))
+summary(ProbitModel)
+
+#Predict probabilities for prototypical individuals
+prototype1$predictedprob <- predict (ProbitModel, newdata = prototype1, type ="response")
+prototype2$predictedprob <- predict (ProbitModel, newdata = prototype2, type ="response")
+prototype3$predictedprob <- predict (ProbitModel, newdata = prototype3, type ="response")
+# Probit Probability
+kable(rbind(prototype1,
+      prototype2,
+      prototype3))
+
+#Impose appropriate sample selection criteria here
+MLDsubsample <- subset(dats, LOANPRC >= 50 & MALE != "." & MARRIED != "." & (GDLIN == 1 | GDLIN == 0))
+
+ 
+#Estimate Logit Model (I am not necessarily recommending this model -- this is purely illustrative)
+LogitModel <- glm(APPROVE ~ OBRAT + GDLIN + LOANPRC + MALE + MARRIED + BLACK + HISPAN, data = MLDsubsample, 
+                 family = "binomial")
+summary(LogitModel)
+
+#Generate Log-Likelihood
+logLik(LogitModel)
+
+
+```
+
+#Probit Model Analysis
+Stick with Logit Model since its easier to translate
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+
+# this gives main effects AND interactions
+ad_aov <- aov(APPROVE ~ OBRAT * BLACK + HISPAN * OBRAT + LOANPRC * BLACK + LOANPRC * HISPAN, data = dats, family = "binomial" (link = "probit"))
+# this would give ONLY main effects
+ad_aov2 <- aov(APPROVE ~ OBRAT + BLACK + HISPAN + MARRIED + LOANPRC + GDLIN, data = dats, family = "binomial" (link = "probit"))
+summary(ad_aov)
+summary(ad_aov2)
+tidy_ad_aov <- broom::tidy(ad_aov)
+kable(tidy_ad_aov)
+
+```
+
+
