@@ -2,9 +2,12 @@
 title: "EDA of Mortgage Loan Decisions"
 author: "Afsar Ali"
 output:
-  html_document:
+  prettydoc::html_pretty:
+    theme: Cayman
+    highlight: github
+    df_print: paged
     toc: yes
-    toc_depth: 4
+    toc_depth: '4'
 ---
 
 ## Code header 
