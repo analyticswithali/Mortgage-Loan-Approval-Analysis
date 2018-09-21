@@ -4,7 +4,7 @@ In this study, we examine a sample of mortgage lending decision data from Boston
 whether race is associated with the outcome of a mortgage loan application. Using this data, we seek to
 answer the question: Do mortgage lending institutions discriminate against minorities?
 
-1. Intial EDA [html file](https://rawgit.com/analyticswithali/Mortgage-Loan-Approval-Analysis/master/Mortgage%20Loan%20Approval%20Analysis%20EDA.html)
+1. Intial EDA [html file](https://rawgit.com/analyticswithali/Mortgage-Loan-Approval-Analysis/master/Mortgage_Loan_Approval_Analysis_EDA.html)
 3. Final Analysis [PDF file](https://rawgit.com/analyticswithali/Mortgage-Loan-Approval-Analysis/master/Mortgage%20Loan%20Approval%20Analysis%20Final.pdf)
 
 ## Steps to this Analysis
